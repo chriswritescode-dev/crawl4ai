@@ -1221,8 +1221,13 @@ class BrowserManager:
                 ]
             )
 
-        # Handle navigator overrides
-        if crawlerRunConfig:
+        # Handle navigator overrides — skipped under the undetected adapter.
+        # Patchright already patches navigator.* natively, and injecting our
+        # own init scripts on top of it triggers a Chromium DNS resolver
+        # regression (ERR_NAME_NOT_RESOLVED on every goto). Patchright docs
+        # also explicitly recommend against custom init scripts because they
+        # re-introduce the very fingerprints patchright is trying to hide.
+        if crawlerRunConfig and not self.use_undetected:
             if (
                 crawlerRunConfig.override_navigator
                 or crawlerRunConfig.simulate_user

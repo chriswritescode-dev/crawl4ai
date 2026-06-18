@@ -595,7 +595,14 @@ class AsyncPlaywrightCrawlerStrategy(AsyncCrawlerStrategy):
             # at context level by setup_context(). This fallback covers
             # managed-browser / persistent / CDP paths where setup_context()
             # is called without a crawlerRunConfig.
-            if config.override_navigator or config.simulate_user or config.magic:
+            #
+            # Skipped under the undetected adapter: patchright handles
+            # navigator.* natively, and adding init scripts on top breaks
+            # Chromium's DNS resolver (every goto fails ERR_NAME_NOT_RESOLVED).
+            if (
+                (config.override_navigator or config.simulate_user or config.magic)
+                and not isinstance(self.adapter, UndetectedAdapter)
+            ):
                 if not getattr(context, '_crawl4ai_nav_overrider_injected', False):
                     await context.add_init_script(load_js_script("navigator_overrider"))
                     context._crawl4ai_nav_overrider_injected = True

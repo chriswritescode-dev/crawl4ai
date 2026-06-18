@@ -176,8 +176,18 @@ RUN crawl4ai-setup
 
 RUN playwright install --with-deps
 
+# Patchright (used by UndetectedAdapter) ships its own headless-shell build
+# that the Linux Chromium fork it patches expects. Install it here so the
+# undetected adapter can launch as appuser without re-downloading at runtime.
+RUN python -m patchright install --with-deps chromium
+
+# Copy every Playwright/Patchright browser into appuser's cache so the
+# non-root runtime user can launch them without permission errors. This
+# includes both `chromium-*` (regular) and `chromium_headless_shell-*`
+# (used by patchright). The wildcard ignores the missing pattern thanks
+# to nullglob via /bin/bash.
 RUN mkdir -p /home/appuser/.cache/ms-playwright \
-    && cp -r /root/.cache/ms-playwright/chromium-* /home/appuser/.cache/ms-playwright/ \
+    && bash -c 'shopt -s nullglob; for d in /root/.cache/ms-playwright/chromium-* /root/.cache/ms-playwright/chromium_headless_shell-* /root/.cache/ms-playwright/firefox-* /root/.cache/ms-playwright/webkit-*; do cp -r "$d" /home/appuser/.cache/ms-playwright/; done' \
     && chown -R appuser:appuser /home/appuser/.cache/ms-playwright
 
 RUN crawl4ai-doctor
