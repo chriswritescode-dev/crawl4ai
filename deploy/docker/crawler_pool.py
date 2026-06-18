@@ -9,6 +9,30 @@ import logging
 logger = logging.getLogger(__name__)
 CONFIG = load_config()
 
+# When true, every pooled crawler runs through the UndetectedAdapter
+# (patchright) instead of the stock Playwright adapter. Patchright patches
+# navigator.* natively, so navigator-override init scripts are skipped
+# (see browser_manager / async_crawler_strategy) to avoid the Chromium DNS
+# resolver regression.
+USE_UNDETECTED = bool(CONFIG.get("crawler", {}).get("browser", {}).get("undetected", False))
+
+
+def _make_crawler(cfg: BrowserConfig) -> AsyncWebCrawler:
+    """Single construction point for every pooled AsyncWebCrawler.
+
+    Centralizes adapter selection so undetected mode is wired in exactly one
+    place rather than duplicated across get_crawler() and init_permanent().
+    """
+    if USE_UNDETECTED:
+        from crawl4ai.async_crawler_strategy import AsyncPlaywrightCrawlerStrategy
+        from crawl4ai.browser_adapter import UndetectedAdapter
+        strategy = AsyncPlaywrightCrawlerStrategy(
+            browser_config=cfg,
+            browser_adapter=UndetectedAdapter(),
+        )
+        return AsyncWebCrawler(crawler_strategy=strategy, config=cfg, thread_safe=False)
+    return AsyncWebCrawler(config=cfg, thread_safe=False)
+
 # Pool tiers
 PERMANENT: Optional[AsyncWebCrawler] = None  # Always-ready default browser
 HOT_POOL: Dict[str, AsyncWebCrawler] = {}    # Frequent configs
@@ -110,7 +134,7 @@ async def get_crawler(cfg: BrowserConfig) -> AsyncWebCrawler:
 
         # Create new in cold pool
         logger.info(f"🆕 Creating new browser in cold pool (sig={sig[:8]}, mem={mem_pct:.1f}%)")
-        crawler = AsyncWebCrawler(config=cfg, thread_safe=False)
+        crawler = _make_crawler(cfg)
         await crawler.start()
         crawler.active_requests = 1
         COLD_POOL[sig] = crawler
@@ -137,7 +161,7 @@ async def init_permanent(cfg: BrowserConfig):
             return
         DEFAULT_CONFIG_SIG = _sig(cfg)
         logger.info("🔥 Creating permanent default browser")
-        PERMANENT = AsyncWebCrawler(config=cfg, thread_safe=False)
+        PERMANENT = _make_crawler(cfg)
         await PERMANENT.start()
         LAST_USED[DEFAULT_CONFIG_SIG] = time.time()
         USAGE_COUNT[DEFAULT_CONFIG_SIG] = 0

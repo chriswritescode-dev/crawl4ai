@@ -85,6 +85,10 @@ crawler:
     max_pages: 40                          # ← GLOBAL_SEM permits
     idle_ttl_sec: 300                     # ← 30 min janitor cutoff
   browser:
+    # Run all pooled browsers through the UndetectedAdapter (patchright) for
+    # stealth crawling. Requires the patchright headless-shell installed in the
+    # image (see Dockerfile). Set to false to use the stock Playwright adapter.
+    undetected: true
     kwargs:
       headless: true
       text_mode: true
