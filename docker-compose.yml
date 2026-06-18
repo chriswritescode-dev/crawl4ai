@@ -27,7 +27,10 @@ x-base-config: &base-config
   tmpfs:
     - /tmp
     - /var/lib/redis
-    - /var/lib/crawl4ai/outputs:mode=0700
+    # Artifact store for screenshot/PDF/MHTML output. The tmpfs defaults to
+    # root ownership, so it must be owned by appuser (uid/gid 999) or the
+    # non-root process gets EACCES writing artifacts (screenshot 500).
+    - /var/lib/crawl4ai/outputs:mode=0700,uid=999,gid=999
     - /home/appuser/.cache
     # crawl4ai writes runtime cache/logs to ~/.crawl4ai and gunicorn writes its
     # control socket/temp to ~/.gunicorn; both need to be writable under the
