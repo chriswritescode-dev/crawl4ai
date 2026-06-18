@@ -31,23 +31,24 @@ x-base-config: &base-config
   read_only: true
   tmpfs:
     - /tmp
-    - /var/lib/redis
-    # Artifact store for screenshot/PDF/MHTML output. The tmpfs defaults to
-    # root ownership, so it must be owned by appuser (uid/gid 999) or the
-    # non-root process gets EACCES writing artifacts (screenshot 500).
+    # All appuser-owned tmpfs mounts pin uid/gid 999: a bare tmpfs defaults to
+    # root ownership and is remounted fresh on `docker compose restart`, so
+    # without this the non-root process gets EACCES after a restart.
+    - /var/lib/redis:uid=999,gid=999
+    # Artifact store for screenshot/PDF/MHTML output.
     - /var/lib/crawl4ai/outputs:mode=0700,uid=999,gid=999
-    - /home/appuser/.cache
+    - /home/appuser/.cache:uid=999,gid=999
     # crawl4ai writes runtime cache/logs to ~/.crawl4ai and gunicorn writes its
     # control socket/temp to ~/.gunicorn; both need to be writable under the
     # read_only rootfs.
-    - /home/appuser/.crawl4ai
-    - /home/appuser/.gunicorn
+    - /home/appuser/.crawl4ai:uid=999,gid=999
+    - /home/appuser/.gunicorn:uid=999,gid=999
     # Chromium writes its profile/state under ~/.config (and ~/.local, ~/.pki);
     # without these tmpfs mounts it crashes on launch (crashpad socket reset /
     # TargetClosedError) under the read_only rootfs.
-    - /home/appuser/.config
-    - /home/appuser/.local
-    - /home/appuser/.pki
+    - /home/appuser/.config:uid=999,gid=999
+    - /home/appuser/.local:uid=999,gid=999
+    - /home/appuser/.pki:uid=999,gid=999
   deploy:
     resources:
       limits:
@@ -109,8 +110,8 @@ services:
       - ${CRAWL4AI_PROFILE_DIR:-${HOME}/.crawl4ai/profiles/google-auth}:/profiles/google-auth
     tmpfs:
       - /tmp
-      - /home/appuser/.cache
-      - /home/appuser/.config
-      - /home/appuser/.local
-      - /home/appuser/.pki
+      - /home/appuser/.cache:uid=999,gid=999
+      - /home/appuser/.config:uid=999,gid=999
+      - /home/appuser/.local:uid=999,gid=999
+      - /home/appuser/.pki:uid=999,gid=999
     restart: "no"
