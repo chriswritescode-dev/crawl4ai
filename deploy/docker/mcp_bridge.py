@@ -202,6 +202,10 @@ def attach_mcp(
 
         from pydantic import TypeAdapter
         from mcp.types import JSONRPCMessage
+        try:
+            from mcp.shared.message import SessionMessage
+        except ImportError:  # older mcp layouts re-export it here
+            from mcp.shared.session import SessionMessage
         adapter = TypeAdapter(JSONRPCMessage)
 
         init_done = anyio.Event()
@@ -209,8 +213,11 @@ def attach_mcp(
         async def srv_to_ws():
             first = True 
             try:
-                async for msg in s2c_recv:
-                    await ws.send_json(msg.model_dump())
+                async for session_msg in s2c_recv:
+                    # mcp>=1.26 puts a SessionMessage on the stream; the wire
+                    # carries the inner JSONRPCMessage.
+                    jsonrpc_msg = getattr(session_msg, "message", session_msg)
+                    await ws.send_json(jsonrpc_msg.model_dump())
                     if first:
                         init_done.set()
                         first = False
@@ -222,13 +229,14 @@ def attach_mcp(
 
         async def ws_to_srv():
             try:
-                # 1st frame is always "initialize"
+                # 1st frame is always "initialize". mcp>=1.26 expects each
+                # inbound message wrapped in a SessionMessage.
                 first = adapter.validate_python(await ws.receive_json())
-                await c2s_send.send(first)
+                await c2s_send.send(SessionMessage(message=first))
                 await init_done.wait()          # block until server ready
                 while True:
                     data = await ws.receive_json()
-                    await c2s_send.send(adapter.validate_python(data))
+                    await c2s_send.send(SessionMessage(message=adapter.validate_python(data)))
             except WebSocketDisconnect:
                 await c2s_send.aclose()
 
