@@ -92,6 +92,14 @@ crawler:
     kwargs:
       headless: true
       text_mode: true
+      # Persistent Chrome profile so logged-in sessions/cookies carry across
+      # crawls. The directory is bind-mounted from the host (see
+      # docker-compose.yml) and populated via the one-time login sidecar.
+      # use_persistent_context makes crawl4ai launch_persistent_context() on
+      # this dir, which is also the patchright-recommended way to run a profile.
+      user_data_dir: "/profiles/google-auth"
+      use_persistent_context: true
+      use_managed_browser: true
     extra_args:
       # - "--single-process"
       # SECURITY: --no-sandbox disables the Chromium renderer sandbox (a renderer

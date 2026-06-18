@@ -186,6 +186,8 @@ requirements0.txt
 a.txt
 
 *.sh
+!deploy/docker/entrypoint.sh
+!deploy/docker/browser_vnc.sh
 .idea
 docs/examples/.chainlit/
 docs/examples/.chainlit/*

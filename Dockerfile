@@ -86,6 +86,18 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && apt-get clean \ 
     && rm -rf /var/lib/apt/lists/*
 
+# Remote-browser stack: Xvfb (already present) + x11vnc + noVNC/websockify +
+# a minimal window manager. Used by the optional browser-vnc service to run a
+# headed patchright Chromium that a remote machine can drive in a web browser
+# (e.g. for one-time profile logins).
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    x11vnc \
+    novnc \
+    websockify \
+    fluxbox \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
 RUN apt-get update && apt-get dist-upgrade -y \
     && rm -rf /var/lib/apt/lists/*
 
@@ -204,6 +216,9 @@ COPY deploy/docker/* ${APP_HOME}/
 
 # copy the playground + any future static assets
 COPY deploy/docker/static ${APP_HOME}/static
+
+# Ensure helper scripts are executable before the dir is locked read-only.
+RUN chmod a+rx ${APP_HOME}/browser_vnc.sh
 
 # /app is root-owned and read-only to the runtime user: a write bug can no
 # longer plant a persistent self-RCE in the application directory.

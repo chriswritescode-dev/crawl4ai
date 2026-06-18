@@ -49,7 +49,18 @@ class AuthGateMiddleware:
             await self.app(scope, receive, send)
             return
 
-        if scope.get("path", "") in self.public_paths:
+        path = scope.get("path", "")
+        if path in self.public_paths:
+            await self.app(scope, receive, send)
+            return
+
+        # OAuth/OpenID discovery probes must NOT be answered with 401: a 401
+        # here signals "this resource is OAuth-protected", which makes clients
+        # (e.g. OpenCode) enter a slow OAuth flow before falling back to the
+        # API token. Let well-known discovery paths through so the app returns
+        # a clean 404, telling the client there is no OAuth and to use the
+        # Authorization header directly. These paths expose no protected data.
+        if "/.well-known/" in path:
             await self.app(scope, receive, send)
             return
 

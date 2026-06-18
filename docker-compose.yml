@@ -4,6 +4,11 @@ x-base-config: &base-config
     - "11235:11235"  # Gunicorn port
   env_file:
     - .llm.env       # API keys (create from .llm.env.example)
+  # Persistent Chrome profile (logged-in cookies/session) shared between the
+  # headless crawler and the one-time login sidecar. Host dir must be writable
+  # by the container user (uid 999).
+  volumes:
+    - ${CRAWL4AI_PROFILE_DIR:-${HOME}/.crawl4ai/profiles/google-auth}:/profiles/google-auth
   # Uncomment to set default environment variables (will overwrite .llm.env)
   # environment:
   #   - OPENAI_API_KEY=${OPENAI_API_KEY:-}
@@ -75,3 +80,37 @@ services:
     
     # Inherit shared config
     <<: *base-config
+
+  # Optional headed-browser-over-noVNC service. Not started by default; bring it
+  # up only when you need to interact with a real browser remotely (e.g. a
+  # one-time login to populate the shared profile):
+  #   IMAGE=crawl4ai:local docker compose --profile vnc up -d browser-vnc
+  # then open http://<host>:6080/vnc.html, log in, and stop it again.
+  browser-vnc:
+    profiles: ["vnc"]
+    image: ${IMAGE:-unclecode/crawl4ai:${TAG:-latest}}
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        INSTALL_TYPE: ${INSTALL_TYPE:-default}
+        ENABLE_GPU: ${ENABLE_GPU:-false}
+    entrypoint: ["/app/browser_vnc.sh"]
+    user: "appuser"
+    shm_size: "1gb"
+    security_opt:
+      - no-new-privileges:true
+    ports:
+      - "6080:6080"   # noVNC web UI
+    environment:
+      - PROFILE_DIR=/profiles/google-auth
+      - START_URL=${VNC_START_URL:-https://accounts.google.com}
+    volumes:
+      - ${CRAWL4AI_PROFILE_DIR:-${HOME}/.crawl4ai/profiles/google-auth}:/profiles/google-auth
+    tmpfs:
+      - /tmp
+      - /home/appuser/.cache
+      - /home/appuser/.config
+      - /home/appuser/.local
+      - /home/appuser/.pki
+    restart: "no"
