@@ -2,10 +2,10 @@
 app:
   title: "Crawl4AI API"
   version: "1.0.0"
-  # Loopback by default. Exposing on 0.0.0.0 requires a credential
-  # (CRAWL4AI_API_TOKEN); the startup auth guard refuses an open non-loopback
-  # bind without one. Put a TLS-terminating reverse proxy in front for exposure.
-  host: "127.0.0.1"
+  # Exposed on the LAN. The startup auth guard requires a credential for a
+  # non-loopback bind, so CRAWL4AI_API_TOKEN must be set (see .llm.env);
+  # clients then authenticate with 'Authorization: Bearer <token>'.
+  host: "0.0.0.0"
   port: 11235
   reload: False
   workers: 1

@@ -172,23 +172,25 @@ RUN pip install --no-cache-dir --upgrade pip && \
     python -c "import crawl4ai; print('✅ crawl4ai is ready to rock!')" && \
     python -c "from playwright.sync_api import sync_playwright; print('✅ Playwright is feeling dramatic!')"
 
+# Install browsers into /opt/ms-playwright instead of ~/.cache/ms-playwright.
+# The runtime compose mounts an empty tmpfs over /home/appuser/.cache (needed
+# for read_only:true), which would shadow any browsers baked into the home
+# cache. /opt is outside that tmpfs, so browsers survive at runtime. Both
+# playwright and patchright honor PLAYWRIGHT_BROWSERS_PATH.
+ENV PLAYWRIGHT_BROWSERS_PATH=/opt/ms-playwright
+
 RUN crawl4ai-setup
 
 RUN playwright install --with-deps
 
 # Patchright (used by UndetectedAdapter) ships its own headless-shell build
 # that the Linux Chromium fork it patches expects. Install it here so the
-# undetected adapter can launch as appuser without re-downloading at runtime.
+# undetected adapter can launch without re-downloading at runtime.
 RUN python -m patchright install --with-deps chromium
 
-# Copy every Playwright/Patchright browser into appuser's cache so the
-# non-root runtime user can launch them without permission errors. This
-# includes both `chromium-*` (regular) and `chromium_headless_shell-*`
-# (used by patchright). The wildcard ignores the missing pattern thanks
-# to nullglob via /bin/bash.
-RUN mkdir -p /home/appuser/.cache/ms-playwright \
-    && bash -c 'shopt -s nullglob; for d in /root/.cache/ms-playwright/chromium-* /root/.cache/ms-playwright/chromium_headless_shell-* /root/.cache/ms-playwright/firefox-* /root/.cache/ms-playwright/webkit-*; do cp -r "$d" /home/appuser/.cache/ms-playwright/; done' \
-    && chown -R appuser:appuser /home/appuser/.cache/ms-playwright
+# Browsers are root-owned read-only under /opt; the non-root runtime user only
+# needs read+execute to launch them, so no chown is required.
+RUN chmod -R a+rX /opt/ms-playwright
 
 RUN crawl4ai-doctor
 
