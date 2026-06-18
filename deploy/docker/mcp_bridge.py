@@ -11,6 +11,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from starlette.routing import Route, Mount
 from mcp.server.sse import SseServerTransport
+from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
 
 import mcp.types as t
 from mcp.server.lowlevel.server import Server, NotificationOptions
@@ -193,6 +194,19 @@ def attach_mcp(
         ),
     )
 
+    # ── Streamable HTTP transport (single endpoint, no handshake) ──
+    # SSE requires a 3-step handshake (GET /sse → endpoint event → POST
+    # /messages) that adds seconds of connect latency. Streamable HTTP lets a
+    # client POST directly to /mcp, eliminating the delay. The session manager
+    # must be driven by session_manager.run() for the app's lifetime, which the
+    # server.py lifespan enters via app.state.mcp_session_manager.
+    session_manager = StreamableHTTPSessionManager(
+        app=mcp,
+        json_response=False,   # stream responses as SSE (supports server notifications)
+        stateless=False,       # track sessions for multi-turn interactions
+    )
+    app.state.mcp_session_manager = session_manager
+
     # ── WebSocket transport ────────────────────────────────────
     @app.websocket_route(f"{base}/ws")
     async def _ws(ws: WebSocket):
@@ -268,6 +282,12 @@ def attach_mcp(
             "resources": [x.model_dump() for x in await _list_resources()],
             "resource_templates": [x.model_dump() for x in await _list_templates()],
         })
+
+    # ── Streamable HTTP catch-all mount ────────────────────────
+    # Registered LAST so the explicit routes above (/mcp/ws, /mcp/sse,
+    # /mcp/messages, /mcp/schema) match first; this handles POST/GET/DELETE on
+    # the bare /mcp endpoint for the Streamable HTTP transport.
+    app.routes.append(Mount(base, app=session_manager.handle_request))
 
 
 # ── helpers ────────────────────────────────────────────────────

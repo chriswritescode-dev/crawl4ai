@@ -201,7 +201,15 @@ async def lifespan(_: FastAPI):
     app.state.janitor = asyncio.create_task(janitor())
     app.state.timeline_updater = asyncio.create_task(_timeline_updater())
 
-    yield
+    # Drive the MCP Streamable HTTP session manager for the app's lifetime.
+    # Without an active run() context the manager has no task group and the
+    # /mcp Streamable HTTP endpoint fails.
+    mcp_mgr = getattr(app.state, "mcp_session_manager", None)
+    if mcp_mgr is not None:
+        async with mcp_mgr.run():
+            yield
+    else:
+        yield
 
     # Cleanup
     app.state.janitor.cancel()
