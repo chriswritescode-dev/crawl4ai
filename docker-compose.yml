@@ -29,6 +29,17 @@ x-base-config: &base-config
     - /var/lib/redis
     - /var/lib/crawl4ai/outputs:mode=0700
     - /home/appuser/.cache
+    # crawl4ai writes runtime cache/logs to ~/.crawl4ai and gunicorn writes its
+    # control socket/temp to ~/.gunicorn; both need to be writable under the
+    # read_only rootfs.
+    - /home/appuser/.crawl4ai
+    - /home/appuser/.gunicorn
+    # Chromium writes its profile/state under ~/.config (and ~/.local, ~/.pki);
+    # without these tmpfs mounts it crashes on launch (crashpad socket reset /
+    # TargetClosedError) under the read_only rootfs.
+    - /home/appuser/.config
+    - /home/appuser/.local
+    - /home/appuser/.pki
   deploy:
     resources:
       limits:
