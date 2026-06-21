@@ -1013,7 +1013,6 @@ def chunk_doc_sections(doc: str) -> List[str]:
 
 @app.get("/ask")
 @limiter.limit(config["rate_limiting"]["default_limit"])
-@mcp_tool("ask")
 async def get_context(
     request: Request,
     _td: Dict = Depends(token_dep),
